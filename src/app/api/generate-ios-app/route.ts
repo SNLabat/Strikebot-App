@@ -126,8 +126,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // --- Compile Knowledge Base into System Instructions ---
+    const enrichedConfig = { ...config };
+    enrichedConfig.systemInstructions = compileSystemInstructions(config);
+
     // --- Generated StrikebotConfig.json ---
-    const configJson = JSON.stringify(config, null, 2);
+    const configJson = JSON.stringify(enrichedConfig, null, 2);
     archive.append(configJson, {
       name: 'StrikebotChatbot/StrikebotChatbot/StrikebotConfig.json',
     });
@@ -204,6 +208,80 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Compile knowledge base entries into the system instructions
+function compileSystemInstructions(config: iOSChatbotConfig): string {
+  const parts: string[] = [];
+
+  // Start with the user's original system instructions
+  if (config.systemInstructions?.trim()) {
+    parts.push(config.systemInstructions.trim());
+  }
+
+  const kb = config.knowledgeBase;
+  if (!kb) return parts.join('\n\n');
+
+  const kbSections: string[] = [];
+
+  // Text entries
+  if (kb.textEntries && kb.textEntries.length > 0) {
+    const textBlock = kb.textEntries
+      .map((entry) => `### ${entry.title}\n${entry.content}`)
+      .join('\n\n');
+    kbSections.push(textBlock);
+  }
+
+  // Q&A pairs
+  if (kb.qaEntries && kb.qaEntries.length > 0) {
+    const qaBlock = kb.qaEntries
+      .map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`)
+      .join('\n\n');
+    kbSections.push(`## Frequently Asked Questions\n\n${qaBlock}`);
+  }
+
+  // Page URLs as reference
+  if (kb.pageUrls && kb.pageUrls.length > 0) {
+    const urlBlock = kb.pageUrls
+      .map((url) => `- ${url}`)
+      .join('\n');
+    kbSections.push(`## Reference URLs\nThe following URLs contain relevant information you should be aware of:\n${urlBlock}`);
+  }
+
+  // Sitemap URLs as reference
+  if (kb.sitemapUrls && kb.sitemapUrls.length > 0) {
+    const sitemapBlock = kb.sitemapUrls
+      .map((url) => `- ${url}`)
+      .join('\n');
+    kbSections.push(`## Sitemap Sources\nContent from these sitemaps has been used to train this chatbot:\n${sitemapBlock}`);
+  }
+
+  // File references
+  if (kb.fileReferences && kb.fileReferences.length > 0) {
+    const fileBlock = kb.fileReferences
+      .map((f) => `- ${f.name} (${f.type})`)
+      .join('\n');
+    kbSections.push(`## Reference Documents\n${fileBlock}`);
+  }
+
+  // Add knowledge base section if there's any content
+  if (kbSections.length > 0) {
+    parts.push(
+      '---\n\n# Knowledge Base\n\nUse the following information to answer questions accurately. ' +
+      'When a user asks something covered by this knowledge base, prioritize this information in your response. ' +
+      'If the user asks something not covered here, use your general knowledge but let them know if you\'re unsure.\n\n' +
+      kbSections.join('\n\n')
+    );
+  }
+
+  // Fallback message
+  if (config.fallbackMessage?.trim()) {
+    parts.push(
+      `If you cannot answer a question based on the provided knowledge base or your general knowledge, respond with: "${config.fallbackMessage.trim()}"`
+    );
+  }
+
+  return parts.join('\n\n');
 }
 
 function generateReadme(config: iOSChatbotConfig, name: string): string {

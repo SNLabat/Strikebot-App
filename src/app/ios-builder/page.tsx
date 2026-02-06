@@ -108,6 +108,65 @@ const COLOR_PRESETS = [
 
 const STEPS = ['Settings', 'Knowledge', 'Theme', 'Widget', 'Chat', 'Preview'];
 
+// ── Knowledge Base Compiler ──────────────────────────────
+
+function compileKnowledgeBase(config: iOSConfig): string {
+  const parts: string[] = [];
+
+  if (config.systemInstructions?.trim()) {
+    parts.push(config.systemInstructions.trim());
+  }
+
+  const kb = config.knowledgeBase;
+  const kbSections: string[] = [];
+
+  if (kb.textEntries.length > 0) {
+    const textBlock = kb.textEntries
+      .map((entry) => `### ${entry.title}\n${entry.content}`)
+      .join('\n\n');
+    kbSections.push(textBlock);
+  }
+
+  if (kb.qaEntries.length > 0) {
+    const qaBlock = kb.qaEntries
+      .map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`)
+      .join('\n\n');
+    kbSections.push(`## Frequently Asked Questions\n\n${qaBlock}`);
+  }
+
+  if (kb.pageUrls.length > 0) {
+    const urlBlock = kb.pageUrls.map((url) => `- ${url}`).join('\n');
+    kbSections.push(`## Reference URLs\nThe following URLs contain relevant information you should be aware of:\n${urlBlock}`);
+  }
+
+  if (kb.sitemapUrls.length > 0) {
+    const sitemapBlock = kb.sitemapUrls.map((url) => `- ${url}`).join('\n');
+    kbSections.push(`## Sitemap Sources\nContent from these sitemaps has been used to train this chatbot:\n${sitemapBlock}`);
+  }
+
+  if (kb.fileReferences.length > 0) {
+    const fileBlock = kb.fileReferences.map((f) => `- ${f.name} (${f.type})`).join('\n');
+    kbSections.push(`## Reference Documents\n${fileBlock}`);
+  }
+
+  if (kbSections.length > 0) {
+    parts.push(
+      '---\n\n# Knowledge Base\n\nUse the following information to answer questions accurately. ' +
+      'When a user asks something covered by this knowledge base, prioritize this information in your response. ' +
+      "If the user asks something not covered here, use your general knowledge but let them know if you're unsure.\n\n" +
+      kbSections.join('\n\n')
+    );
+  }
+
+  if (config.fallbackMessage?.trim()) {
+    parts.push(
+      `If you cannot answer a question based on the provided knowledge base or your general knowledge, respond with: "${config.fallbackMessage.trim()}"`
+    );
+  }
+
+  return parts.join('\n\n');
+}
+
 // ── Main Component ─────────────────────────────────────
 
 export default function iOSBuilderPage() {
@@ -352,7 +411,7 @@ export default function iOSBuilderPage() {
               )}
               {currentStep === 4 && (
                 <IOSChatTester
-                  config={config}
+                  config={{ ...config, systemInstructions: compileKnowledgeBase(config) }}
                   settings={appSettings}
                   messages={currentMessages}
                   onMessagesChange={handleMessagesChange}
@@ -832,6 +891,47 @@ function KnowledgeStep({
               rows={3}
             />
           </Field>
+        </div>
+      )}
+
+      {/* Compiled Prompt Preview */}
+      {(kb.textEntries.length > 0 || kb.qaEntries.length > 0 || kb.pageUrls.length > 0 || kb.sitemapUrls.length > 0 || kb.fileReferences.length > 0 || config.fallbackMessage?.trim()) && (
+        <CompiledPromptPreview config={config} />
+      )}
+    </div>
+  );
+}
+
+function CompiledPromptPreview({ config }: { config: iOSConfig }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const compiled = compileKnowledgeBase(config);
+  const charCount = compiled.length;
+  const kbEntryCount =
+    config.knowledgeBase.textEntries.length +
+    config.knowledgeBase.qaEntries.length +
+    config.knowledgeBase.pageUrls.length +
+    config.knowledgeBase.sitemapUrls.length +
+    config.knowledgeBase.fileReferences.length;
+
+  return (
+    <div className="mt-6 border border-gray-700 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/50 hover:bg-gray-800 transition"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-green-400 text-lg">&#9679;</span>
+          <div className="text-left">
+            <p className="text-sm font-medium text-gray-200">Compiled System Prompt</p>
+            <p className="text-xs text-gray-500">{kbEntryCount} KB entries &bull; {charCount.toLocaleString()} characters</p>
+          </div>
+        </div>
+        <span className="text-gray-500 text-sm">{isExpanded ? '▲ Hide' : '▼ Preview'}</span>
+      </button>
+      {isExpanded && (
+        <div className="px-4 py-3 border-t border-gray-700 max-h-80 overflow-y-auto">
+          <p className="text-xs text-gray-500 mb-2">This is the full system prompt that will be sent to the AI model, including your knowledge base. Test it in the Chat step.</p>
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono leading-relaxed bg-gray-900/50 rounded-lg p-3">{compiled}</pre>
         </div>
       )}
     </div>

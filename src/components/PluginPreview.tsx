@@ -188,6 +188,48 @@ export default function PluginPreview({ config }: PluginPreviewProps) {
             </dl>
           </div>
 
+          {/* Knowledge Base Summary */}
+          {config.knowledgeBase && (
+            <div className="bg-slate-700/30 rounded-xl p-6 border border-slate-600/50">
+              <div className="flex items-center gap-3 mb-4">
+                <Database className="w-5 h-5 text-orange-400" />
+                <h3 className="font-semibold text-white">Knowledge Base</h3>
+              </div>
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-slate-400">Sitemap URLs</dt>
+                  <dd className="font-medium text-white">{config.knowledgeBase.sitemapUrls.length}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-slate-400">Page URLs</dt>
+                  <dd className="font-medium text-white">{config.knowledgeBase.pageUrls.length}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-slate-400">Text Entries</dt>
+                  <dd className="font-medium text-white">{config.knowledgeBase.textEntries.length}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-slate-400">Q&A Pairs</dt>
+                  <dd className="font-medium text-white">{config.knowledgeBase.qaEntries.length}</dd>
+                </div>
+                {config.conversationStarters && config.conversationStarters.length > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">Conversation Starters</dt>
+                    <dd className="font-medium text-white">{config.conversationStarters.length}</dd>
+                  </div>
+                )}
+                {config.systemPrompt && (
+                  <div>
+                    <dt className="text-slate-400 text-sm mb-1">System Prompt</dt>
+                    <dd className="font-medium text-white text-sm bg-slate-800/50 rounded p-2 line-clamp-3">
+                      {config.systemPrompt}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
           {/* Plugin Info */}
           <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-6">
             <h3 className="font-semibold text-white mb-3">What&apos;s Included in the Plugin</h3>
@@ -202,15 +244,23 @@ export default function PluginPreview({ config }: PluginPreviewProps) {
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 mt-0.5 text-orange-400" />
+                Hamburger menu with chat history &amp; settings
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 mt-0.5 text-orange-400" />
+                Adjustable font size, timestamps, &amp; sound notifications
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 mt-0.5 text-orange-400" />
+                Chat export &amp; conversation management
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 mt-0.5 text-orange-400" />
                 WordPress admin dashboard
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 mt-0.5 text-orange-400" />
                 Customizable widget appearance
-              </li>
-              <li className="flex items-start gap-2">
-                <Check className="w-4 h-4 mt-0.5 text-orange-400" />
-                Media Library integration for icons
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 mt-0.5 text-orange-400" />

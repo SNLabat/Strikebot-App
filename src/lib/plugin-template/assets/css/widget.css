@@ -105,6 +105,7 @@
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
+    position: relative;
 }
 
 .strikebot-chat-avatar {
@@ -155,6 +156,33 @@
     border-radius: 50%;
 }
 
+/* Hamburger Menu Button */
+.strikebot-hamburger-menu {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.strikebot-hamburger-menu:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.strikebot-hamburger-menu svg {
+    width: 20px;
+    height: 20px;
+    color: #fff;
+    stroke-width: 2.5;
+}
+
 .strikebot-chat-close {
     width: 32px;
     height: 32px;
@@ -178,6 +206,506 @@
     color: #fff;
 }
 
+/* Sidebar Overlay */
+.strikebot-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
+    z-index: 999998;
+}
+
+.strikebot-sidebar-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Sidebar Panel */
+.strikebot-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    background: var(--sb-bg);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 999999;
+    border-right: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+
+.strikebot-dark .strikebot-sidebar {
+    border-right-color: #374151;
+}
+
+.strikebot-sidebar.strikebot-sidebar-open {
+    transform: translateX(0);
+}
+
+/* Sidebar Header */
+.strikebot-sidebar-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--sb-bg);
+}
+
+.strikebot-dark .strikebot-sidebar-header {
+    border-bottom-color: #374151;
+}
+
+.strikebot-sidebar-header h3 {
+    flex: 1;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--sb-text);
+}
+
+.strikebot-sidebar-header button {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+    padding: 0;
+}
+
+.strikebot-sidebar-header button:hover {
+    background: #f3f4f6;
+}
+
+.strikebot-dark .strikebot-sidebar-header button:hover {
+    background: #374151;
+}
+
+.strikebot-sidebar-header button svg {
+    width: 18px;
+    height: 18px;
+    color: var(--sb-text);
+}
+
+/* Sidebar Content */
+.strikebot-sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.strikebot-sidebar-section {
+    padding: 12px 0;
+}
+
+.strikebot-sidebar-section h4 {
+    margin: 0;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.strikebot-dark .strikebot-sidebar-section h4 {
+    color: #6b7280;
+}
+
+/* Chat History */
+.strikebot-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.strikebot-history-item {
+    padding: 10px 12px;
+    margin: 0 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-bottom: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+
+.strikebot-history-item:hover {
+    background: #f3f4f6;
+}
+
+.strikebot-dark .strikebot-history-item:hover {
+    background: #374151;
+}
+
+.strikebot-history-item.active {
+    background: var(--sb-primary);
+    color: #fff;
+}
+
+.strikebot-history-item.active .strikebot-history-item-title {
+    color: #fff;
+}
+
+.strikebot-history-item.active .strikebot-history-item-meta {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.strikebot-history-item-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sb-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.strikebot-history-item-meta {
+    font-size: 11px;
+    color: #9ca3af;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.strikebot-history-item:hover .strikebot-history-item-delete {
+    opacity: 1;
+}
+
+.strikebot-history-item-delete {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    padding: 0;
+    color: #6b7280;
+}
+
+.strikebot-history-item-delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.strikebot-history-item.active .strikebot-history-item-delete {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.strikebot-history-item.active .strikebot-history-item-delete:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+.strikebot-history-item-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+.strikebot-history-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.strikebot-dark .strikebot-history-empty {
+    color: #6b7280;
+}
+
+/* Settings Panel */
+.strikebot-settings-group {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.strikebot-dark .strikebot-settings-group {
+    border-bottom-color: #374151;
+}
+
+.strikebot-settings-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sb-text);
+}
+
+.strikebot-settings-group-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Font Size Buttons */
+.strikebot-font-size-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.strikebot-font-size-btn {
+    flex: 1;
+    padding: 8px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 12px;
+    min-height: 32px;
+}
+
+.strikebot-dark .strikebot-font-size-btn {
+    background: #374151;
+    border-color: #4b5563;
+    color: #9ca3af;
+}
+
+.strikebot-font-size-btn:hover:not(.active) {
+    border-color: var(--sb-primary);
+    color: var(--sb-primary);
+}
+
+.strikebot-font-size-btn.active {
+    background: var(--sb-primary);
+    border-color: var(--sb-primary);
+    color: #fff;
+}
+
+.strikebot-font-size-btn.strikebot-font-size-S {
+    font-size: 10px;
+}
+
+.strikebot-font-size-btn.strikebot-font-size-M {
+    font-size: 12px;
+}
+
+.strikebot-font-size-btn.strikebot-font-size-L {
+    font-size: 14px;
+}
+
+.strikebot-font-size-btn.strikebot-font-size-XL {
+    font-size: 16px;
+}
+
+/* Toggle Switch */
+.strikebot-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.strikebot-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.strikebot-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.strikebot-toggle-slider::before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.strikebot-toggle-switch input:checked + .strikebot-toggle-slider {
+    background-color: var(--sb-primary);
+}
+
+.strikebot-toggle-switch input:checked + .strikebot-toggle-slider::before {
+    transform: translateX(20px);
+}
+
+.strikebot-toggle-switch input:focus + .strikebot-toggle-slider {
+    box-shadow: 0 0 1px var(--sb-primary);
+}
+
+/* Clear All Chats Button */
+.strikebot-clear-all-btn {
+    margin: 12px 16px 16px;
+    padding: 10px 16px;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #dc2626;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    width: calc(100% - 32px);
+}
+
+.strikebot-dark .strikebot-clear-all-btn {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.strikebot-clear-all-btn:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+.strikebot-dark .strikebot-clear-all-btn:hover {
+    background: rgba(220, 38, 38, 0.2);
+}
+
+.strikebot-clear-all-btn:active {
+    transform: scale(0.98);
+}
+
+.strikebot-clear-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(220, 38, 38, 0.3);
+    border-radius: 8px;
+    transition: none;
+    pointer-events: none;
+}
+
+.strikebot-clear-all-btn.holding .strikebot-clear-progress-bar {
+    animation: holdProgress 1.5s ease-in forwards;
+}
+
+@keyframes holdProgress {
+    from {
+        width: 0;
+    }
+    to {
+        width: 100%;
+    }
+}
+
+.strikebot-clear-all-btn .strikebot-trash-icon {
+    width: 16px;
+    height: 16px;
+    position: relative;
+    z-index: 1;
+}
+
+.strikebot-clear-all-btn span {
+    position: relative;
+    z-index: 1;
+}
+
+/* New Chat Button */
+.strikebot-sidebar-new-chat {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.strikebot-sidebar-new-chat:hover {
+    background: #f3f4f6;
+}
+
+.strikebot-dark .strikebot-sidebar-new-chat:hover {
+    background: #374151;
+}
+
+.strikebot-sidebar-new-chat svg {
+    width: 18px;
+    height: 18px;
+    color: var(--sb-text);
+}
+
+/* Export Button */
+.strikebot-export-chat {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+    padding: 0;
+    flex-shrink: 0;
+    color: var(--sb-text);
+}
+
+.strikebot-export-chat:hover {
+    background: #f3f4f6;
+}
+
+.strikebot-dark .strikebot-export-chat:hover {
+    background: #374151;
+}
+
+.strikebot-export-chat svg {
+    width: 18px;
+    height: 18px;
+}
+
 /* Messages */
 .strikebot-chat-messages {
     flex: 1;
@@ -188,6 +716,7 @@
     gap: 12px;
     min-height: 300px;
     max-height: 400px;
+    position: relative;
 }
 
 .strikebot-message {
@@ -195,6 +724,7 @@
     gap: 10px;
     max-width: 85%;
     animation: messageIn 0.3s ease;
+    position: relative;
 }
 
 @keyframes messageIn {
@@ -251,6 +781,7 @@
     font-size: 14px;
     line-height: 1.5;
     color: var(--sb-text);
+    position: relative;
 }
 
 .strikebot-message-bot .strikebot-message-content {
@@ -266,6 +797,167 @@
     background: var(--sb-primary);
     color: #fff;
     border-bottom-right-radius: 4px;
+}
+
+/* Message Timestamp */
+.strikebot-message-time {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 4px;
+    opacity: 0.7;
+}
+
+.strikebot-dark .strikebot-message-time {
+    color: #6b7280;
+}
+
+.strikebot-message-time.hidden {
+    display: none;
+}
+
+/* Copy Message Button */
+.strikebot-copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.strikebot-message-bot:hover .strikebot-copy-btn {
+    opacity: 1;
+}
+
+.strikebot-copy-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.strikebot-dark .strikebot-copy-btn {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.strikebot-dark .strikebot-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.strikebot-copy-btn svg {
+    width: 14px;
+    height: 14px;
+    color: var(--sb-text);
+}
+
+.strikebot-dark .strikebot-copy-btn svg {
+    color: #fff;
+}
+
+/* Copy Tooltip */
+.strikebot-copy-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.strikebot-copy-tooltip.show {
+    opacity: 1;
+}
+
+/* Scroll to Bottom Button */
+.strikebot-scroll-to-bottom {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: var(--sb-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    opacity: 1;
+    transition: all 0.3s ease;
+    z-index: 10;
+    pointer-events: auto;
+    position: relative;
+}
+
+.strikebot-scroll-to-bottom:hover {
+    transform: translateX(-50%) scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.strikebot-scroll-to-bottom.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.strikebot-scroll-to-bottom svg {
+    width: 20px;
+    height: 20px;
+    color: #fff;
+}
+
+.strikebot-unread-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    border: 2px solid var(--sb-bg);
+}
+
+.strikebot-dark .strikebot-unread-badge {
+    border-color: #1f2937;
+}
+
+/* Font Size Classes for Messages */
+.strikebot-font-small .strikebot-message-content {
+    font-size: 12px;
+}
+
+.strikebot-font-medium .strikebot-message-content {
+    font-size: 14px;
+}
+
+.strikebot-font-large .strikebot-message-content {
+    font-size: 16px;
+}
+
+.strikebot-font-xlarge .strikebot-message-content {
+    font-size: 18px;
 }
 
 /* Typing Indicator */
@@ -400,6 +1092,36 @@
     color: #fff;
 }
 
+/* Toast Notifications */
+.strikebot-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1f2937;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 999999;
+}
+
+.strikebot-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.strikebot-dark .strikebot-toast {
+    background: #ffffff;
+    color: #1f2937;
+}
+
 /* Powered By */
 .strikebot-powered-by {
     text-align: center;
@@ -443,6 +1165,33 @@
         width: 54px;
         height: 54px;
     }
+
+    .strikebot-sidebar {
+        width: calc(100vw - 60px);
+        max-width: 300px;
+    }
+
+    .strikebot-chat-messages {
+        min-height: 200px;
+        max-height: 300px;
+    }
+
+    .strikebot-scroll-to-bottom {
+        bottom: 12px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .strikebot-scroll-to-bottom svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .strikebot-toast {
+        bottom: 70px;
+        width: calc(100vw - 40px);
+        max-width: 300px;
+    }
 }
 
 /* Scrollbar */
@@ -461,6 +1210,31 @@
 
 .strikebot-chat-messages::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
+}
+
+.strikebot-sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.strikebot-sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.strikebot-sidebar-content::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.strikebot-sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+.strikebot-dark .strikebot-sidebar-content::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.strikebot-dark .strikebot-sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
 }
 
 /* Rating buttons */

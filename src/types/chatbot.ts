@@ -95,6 +95,20 @@ export interface ChatbotConfig {
     modelAccess: 'limited' | 'advanced';
   };
 
+  // Knowledge base (configured in builder, managed in WordPress)
+  knowledgeBase?: {
+    sitemapUrls: string[];
+    pageUrls: string[];
+    textEntries: Array<{ title: string; content: string }>;
+    qaEntries: Array<{ question: string; answer: string }>;
+    fileReferences: Array<{ name: string; type: string }>;
+  };
+
+  // System instructions
+  systemPrompt?: string;
+  fallbackMessage?: string;
+  conversationStarters?: string[];
+
   createdAt: string;
 }
 

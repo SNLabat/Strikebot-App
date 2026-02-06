@@ -8,11 +8,12 @@ import AddOnsSelector from '@/components/AddOnsSelector';
 import ChatbotSettings from '@/components/ChatbotSettings';
 import ThemeCustomizer from '@/components/ThemeCustomizer';
 import WidgetSettings from '@/components/WidgetSettings';
+import KnowledgeBaseEditor from '@/components/KnowledgeBaseEditor';
 import PluginPreview from '@/components/PluginPreview';
-import { Download, Bot, Settings, Palette, MessageSquare, Eye, PlusCircle } from 'lucide-react';
+import { Download, Bot, Settings, Palette, MessageSquare, Eye, PlusCircle, Database } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'tier' | 'addons' | 'settings' | 'theme' | 'widget' | 'preview'>('tier');
+  const [activeTab, setActiveTab] = useState<'tier' | 'addons' | 'settings' | 'knowledge' | 'theme' | 'widget' | 'preview'>('tier');
   const [isGenerating, setIsGenerating] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly');
   const [config, setConfig] = useState<ChatbotConfig>({
@@ -50,6 +51,16 @@ export default function Home() {
       autoRetrain: TIER_CONFIGS.starter.features.autoRetrain,
       modelAccess: TIER_CONFIGS.starter.features.modelAccess,
     },
+    knowledgeBase: {
+      sitemapUrls: [],
+      pageUrls: [],
+      textEntries: [],
+      qaEntries: [],
+      fileReferences: [],
+    },
+    systemPrompt: '',
+    fallbackMessage: '',
+    conversationStarters: [],
     createdAt: new Date().toISOString(),
   });
 
@@ -138,6 +149,7 @@ export default function Home() {
     { id: 'tier', label: 'Plan', icon: Bot },
     { id: 'addons', label: 'Add-Ons', icon: PlusCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'knowledge', label: 'Knowledge', icon: Database },
     { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'widget', label: 'Widget', icon: MessageSquare },
     { id: 'preview', label: 'Preview', icon: Eye },
@@ -205,6 +217,12 @@ export default function Home() {
           )}
           {activeTab === 'settings' && (
             <ChatbotSettings
+              config={config}
+              onConfigChange={setConfig}
+            />
+          )}
+          {activeTab === 'knowledge' && (
+            <KnowledgeBaseEditor
               config={config}
               onConfigChange={setConfig}
             />

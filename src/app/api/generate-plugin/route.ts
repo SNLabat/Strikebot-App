@@ -36,6 +36,16 @@ interface ChatbotConfig {
     modelAccess: string;
   };
   addOns: Array<{ id: string; name: string; type: string; value?: number }>;
+  knowledgeBase?: {
+    sitemapUrls: string[];
+    pageUrls: string[];
+    textEntries: Array<{ title: string; content: string }>;
+    qaEntries: Array<{ question: string; answer: string }>;
+    fileReferences: Array<{ name: string; type: string }>;
+  };
+  systemPrompt?: string;
+  fallbackMessage?: string;
+  conversationStarters?: string[];
   createdAt: string;
 }
 

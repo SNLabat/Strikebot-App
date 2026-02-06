@@ -1,5 +1,6 @@
 /**
  * Strikebot Widget JavaScript
+ * Enhanced with chat history, settings, and advanced features
  */
 (function() {
     'use strict';
@@ -19,7 +20,8 @@
         return sessionId;
     }
 
-    const sessionId = getSessionId();
+    let currentSessionId = getSessionId();
+    let currentMessages = [];
 
     // DOM Elements
     const widget = document.getElementById('strikebot-widget');
@@ -31,10 +33,336 @@
     const sendBtn = document.getElementById('strikebot-send');
     const toggleOpen = document.querySelector('.strikebot-toggle-open');
     const toggleClose = document.querySelector('.strikebot-toggle-close');
+    const hamburger = document.getElementById('strikebot-hamburger-menu');
+    const sidebar = document.getElementById('strikebot-sidebar');
+    const sidebarOverlay = document.getElementById('strikebot-sidebar-overlay');
+    const newChatBtn = document.getElementById('strikebot-sidebar-new-chat');
+    const clearAllBtn = document.getElementById('strikebot-clear-all-chats');
+    const clearProgressBar = document.getElementById('strikebot-clear-progress-bar');
+    const scrollBottomBtn = document.getElementById('strikebot-scroll-to-bottom');
+    const exportBtn = document.getElementById('strikebot-export-chat');
+    const closeSidebarBtn = document.getElementById('strikebot-sidebar-back');
+    const historyList = document.getElementById('strikebot-chat-history-list');
+    const soundToggle = document.getElementById('strikebot-sound-toggle');
+    const timestampsToggle = document.getElementById('strikebot-timestamps-toggle');
 
     // State
     let isOpen = false;
     let isLoading = false;
+    let unreadMessages = 0;
+    let clearAllHoldTime = 0;
+    let clearAllInterval = null;
+
+    // Settings structure
+    const defaultSettings = {
+        fontSize: 'medium',
+        soundNotifications: false,
+        showTimestamps: false
+    };
+
+    // Load settings from localStorage
+    function loadSettings() {
+        const stored = localStorage.getItem('strikebot_settings_local');
+        return stored ? JSON.parse(stored) : defaultSettings;
+    }
+
+    // Save settings to localStorage
+    function saveSettings(settings) {
+        localStorage.setItem('strikebot_settings_local', JSON.stringify(settings));
+        applySettings(settings);
+    }
+
+    // Apply settings to the UI
+    function applySettings(settings) {
+        // Apply font size using CSS classes on widget
+        var fontClasses = ['strikebot-font-small', 'strikebot-font-medium', 'strikebot-font-large', 'strikebot-font-xlarge'];
+        var classMap = {
+            'small': 'strikebot-font-small',
+            'medium': 'strikebot-font-medium',
+            'large': 'strikebot-font-large',
+            'x-large': 'strikebot-font-xlarge'
+        };
+        if (widget) {
+            fontClasses.forEach(function(cls) { widget.classList.remove(cls); });
+            var targetClass = classMap[settings.fontSize] || classMap['medium'];
+            widget.classList.add(targetClass);
+        }
+
+        // Show/hide timestamps
+        document.querySelectorAll('.strikebot-message-time').forEach(function(el) {
+            el.classList.toggle('hidden', !settings.showTimestamps);
+        });
+
+        // Update font size button active states
+        document.querySelectorAll('.strikebot-font-size-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-size') === settings.fontSize);
+        });
+    }
+
+    // Generate timestamp string
+    function formatTimestamp(date) {
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
+        return displayHours + ':' + displayMinutes + ' ' + ampm;
+    }
+
+    // Get current timestamp
+    function getCurrentTimestamp() {
+        return new Date();
+    }
+
+    // Play notification sound using Web Audio API
+    function playNotificationSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.warn('Could not play notification sound:', e);
+        }
+    }
+
+    // Chat History Management Functions
+
+    // Load all chat history
+    function loadChatHistory() {
+        const stored = localStorage.getItem('strikebot_chat_history');
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    // Save all chat history
+    function saveChatHistory(history) {
+        // Keep only last 50 conversations
+        if (history.length > 50) {
+            history = history.slice(-50);
+        }
+        localStorage.setItem('strikebot_chat_history', JSON.stringify(history));
+    }
+
+    // Get conversation title from first user message
+    function getConversationTitle(messages) {
+        for (let i = 0; i < messages.length; i++) {
+            if (messages[i].isUser) {
+                const preview = messages[i].content.substring(0, 50);
+                return preview.length < messages[i].content.length ? preview + '...' : preview;
+            }
+        }
+        return 'New Chat';
+    }
+
+    // Save current conversation to history
+    function saveCurrentConversation() {
+        if (currentMessages.length === 0) {
+            return;
+        }
+
+        const history = loadChatHistory();
+        const existingIndex = history.findIndex(function(item) {
+            return item.sessionId === currentSessionId;
+        });
+
+        const conversationData = {
+            sessionId: currentSessionId,
+            title: getConversationTitle(currentMessages),
+            messages: currentMessages,
+            timestamp: new Date().toISOString(),
+            messageCount: currentMessages.length
+        };
+
+        if (existingIndex !== -1) {
+            history[existingIndex] = conversationData;
+        } else {
+            history.push(conversationData);
+        }
+
+        saveChatHistory(history);
+    }
+
+    // Load conversation by session ID
+    function loadConversation(sessionId) {
+        const history = loadChatHistory();
+        const conversation = history.find(function(item) {
+            return item.sessionId === sessionId;
+        });
+
+        if (conversation) {
+            currentSessionId = sessionId;
+            currentMessages = conversation.messages;
+            messages.innerHTML = '';
+            const settings = loadSettings();
+
+            conversation.messages.forEach(function(msg) {
+                addMessageToDOM(msg.content, msg.isUser, msg.timestamp);
+            });
+
+            unreadMessages = 0;
+            updateScrollButton();
+            closeSidebar();
+        }
+    }
+
+    // Delete conversation from history
+    function deleteConversation(sessionId) {
+        let history = loadChatHistory();
+        history = history.filter(function(item) {
+            return item.sessionId !== sessionId;
+        });
+        saveChatHistory(history);
+        refreshHistoryList();
+
+        if (sessionId === currentSessionId) {
+            startNewChat();
+        }
+    }
+
+    // Clear all conversations
+    function clearAllConversations() {
+        localStorage.removeItem('strikebot_chat_history');
+        refreshHistoryList();
+        startNewChat();
+    }
+
+    // Refresh the history list in sidebar
+    function refreshHistoryList() {
+        const history = loadChatHistory();
+        historyList.innerHTML = '';
+
+        if (history.length === 0) {
+            historyList.innerHTML = '<div class="strikebot-history-empty">No conversations yet</div>';
+            return;
+        }
+
+        // Show most recent first
+        const sortedHistory = history.slice().reverse();
+        sortedHistory.forEach(function(item) {
+            const historyItem = document.createElement('div');
+            historyItem.className = 'strikebot-history-item';
+            if (item.sessionId === currentSessionId) {
+                historyItem.classList.add('active');
+            }
+
+            const timestamp = new Date(item.timestamp);
+            const dateStr = timestamp.toLocaleDateString() + ' ' + timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            historyItem.innerHTML =
+                '<div class="strikebot-history-item-title">' + escapeHtml(item.title) + '</div>' +
+                '<div class="strikebot-history-item-meta">' + dateStr + ' (' + item.messageCount + ' messages)</div>' +
+                '<button class="strikebot-history-item-delete" data-session-id="' + item.sessionId + '" title="Delete">×</button>';
+
+            historyItem.addEventListener('click', function(e) {
+                if (e.target.classList.contains('strikebot-history-item-delete')) {
+                    e.stopPropagation();
+                    deleteConversation(item.sessionId);
+                } else {
+                    loadConversation(item.sessionId);
+                }
+            });
+
+            historyList.appendChild(historyItem);
+        });
+    }
+
+    // Start new chat
+    function startNewChat() {
+        saveCurrentConversation();
+        currentSessionId = generateSessionId();
+        sessionStorage.setItem('strikebot_session', currentSessionId);
+        currentMessages = [];
+        messages.innerHTML = '';
+        input.value = '';
+        unreadMessages = 0;
+        updateScrollButton();
+        refreshHistoryList();
+
+        // Show welcome message
+        addMessageToDOM('Hello! How can I help you today?', false);
+    }
+
+    // Sidebar management
+    function toggleSidebar() {
+        if (!sidebar) return;
+        var isOpening = !sidebar.classList.contains('strikebot-sidebar-open');
+        sidebar.classList.toggle('strikebot-sidebar-open');
+        if (sidebarOverlay) {
+            sidebarOverlay.classList.toggle('hidden', !isOpening);
+        }
+        if (isOpening) {
+            refreshHistoryList();
+        }
+    }
+
+    function closeSidebar() {
+        if (!sidebar) return;
+        sidebar.classList.remove('strikebot-sidebar-open');
+        if (sidebarOverlay) {
+            sidebarOverlay.classList.add('hidden');
+        }
+    }
+
+    // Scroll to bottom button
+    function updateScrollButton() {
+        if (!scrollBottomBtn) return;
+
+        const isAtBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 100;
+        scrollBottomBtn.classList.toggle('hidden', isAtBottom);
+
+        if (!isAtBottom && unreadMessages > 0) {
+            const badge = scrollBottomBtn.querySelector('.strikebot-unread-badge');
+            if (badge) {
+                badge.textContent = unreadMessages;
+                badge.style.display = 'block';
+            }
+        } else if (isAtBottom) {
+            const badge = scrollBottomBtn.querySelector('.strikebot-unread-badge');
+            if (badge) {
+                badge.style.display = 'none';
+            }
+            unreadMessages = 0;
+        }
+    }
+
+    // Export chat as text file
+    function exportChat() {
+        if (currentMessages.length === 0) {
+            alert('No messages to export');
+            return;
+        }
+
+        let exportText = 'Conversation exported on ' + new Date().toLocaleString() + '\n';
+        exportText += '='.repeat(50) + '\n\n';
+
+        currentMessages.forEach(function(msg) {
+            const prefix = msg.isUser ? 'User: ' : 'Bot: ';
+            const timestamp = msg.timestamp ? ' (' + formatTimestamp(new Date(msg.timestamp)) + ')' : '';
+            exportText += prefix + timestamp + '\n';
+            exportText += msg.content + '\n\n';
+        });
+
+        const blob = new Blob([exportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'strikebot-chat-' + currentSessionId + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
     // Decode HTML entities so markdown like [text](url) is recognized even if brackets were encoded
     function decodeHtmlEntities(str) {
@@ -133,11 +461,12 @@
 
         if (isOpen) {
             input.focus();
+            closeSidebar();
         }
     }
 
-    // Add message to chat
-    function addMessage(content, isUser = false) {
+    // Add message to DOM with all features
+    function addMessageToDOM(content, isUser = false, timestamp = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'strikebot-message ' + (isUser ? 'strikebot-message-user' : 'strikebot-message-bot');
 
@@ -166,7 +495,49 @@
             contentDiv.textContent = content;
         }
 
+        const settings = loadSettings();
+        const fontSizes = {
+            'small': '12px',
+            'medium': '14px',
+            'large': '16px',
+            'x-large': '18px'
+        };
+        contentDiv.style.fontSize = fontSizes[settings.fontSize] || fontSizes['medium'];
+
         messageDiv.appendChild(contentDiv);
+
+        // Add timestamp if setting is enabled
+        if (settings.showTimestamps) {
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'strikebot-message-time';
+            timeDiv.textContent = formatTimestamp(timestamp || new Date());
+            contentDiv.appendChild(timeDiv);
+        }
+
+        // Add copy button for bot messages
+        if (!isUser) {
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'strikebot-copy-btn';
+            copyBtn.title = 'Copy message';
+            copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>' +
+                '<rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>' +
+                '</svg>';
+
+            copyBtn.addEventListener('click', function() {
+                const text = contentDiv.textContent.replace(/\s+\d+:\d+\s(AM|PM)$/, '').trim();
+                navigator.clipboard.writeText(text).then(function() {
+                    const originalText = copyBtn.title;
+                    copyBtn.title = 'Copied!';
+                    setTimeout(function() {
+                        copyBtn.title = originalText;
+                    }, 2000);
+                });
+            });
+
+            messageDiv.appendChild(copyBtn);
+        }
+
         if (avatarHtml) {
             messageDiv.insertAdjacentHTML('afterbegin', avatarHtml);
         }
@@ -179,6 +550,25 @@
         }
 
         messages.scrollTop = messages.scrollHeight;
+    }
+
+    // Add message to chat (wrapper for adding to current session)
+    function addMessage(content, isUser = false) {
+        const timestamp = getCurrentTimestamp();
+        currentMessages.push({
+            content: content,
+            isUser: isUser,
+            timestamp: timestamp
+        });
+
+        addMessageToDOM(content, isUser, timestamp);
+
+        if (!isUser) {
+            unreadMessages++;
+        }
+
+        updateScrollButton();
+        saveCurrentConversation();
     }
 
     // Add rating buttons to bot message
@@ -219,7 +609,7 @@
         const formData = new FormData();
         formData.append('action', 'strikebot_rate_message');
         formData.append('nonce', strikebotWidget.nonce);
-        formData.append('session_id', sessionId);
+        formData.append('session_id', currentSessionId);
         formData.append('rating', rating);
 
         fetch(strikebotWidget.ajaxUrl, {
@@ -302,7 +692,7 @@
             formData.append('action', 'strikebot_chat');
             formData.append('nonce', strikebotWidget.nonce);
             formData.append('message', message);
-            formData.append('session_id', sessionId);
+            formData.append('session_id', currentSessionId);
 
             const response = await fetch(strikebotWidget.ajaxUrl, {
                 method: 'POST',
@@ -314,6 +704,10 @@
             removeTypingIndicator();
 
             if (data.success) {
+                const settings = loadSettings();
+                if (settings.soundNotifications) {
+                    playNotificationSound();
+                }
                 addMessage(data.data.response);
             } else {
                 addMessage(data.data?.message || 'Sorry, I encountered an error. Please try again.');
@@ -329,7 +723,130 @@
         }
     }
 
-    // Event listeners
+    // Clear all handler with press-and-hold
+    function setupClearAllHandler() {
+        if (!clearAllBtn) return;
+
+        function startHold() {
+            clearAllHoldTime = 0;
+            const progressBar = clearProgressBar || clearAllBtn.querySelector('.strikebot-clear-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = '0';
+                progressBar.style.display = 'block';
+            }
+
+            clearAllInterval = setInterval(function() {
+                clearAllHoldTime += 10;
+                const progress = (clearAllHoldTime / 1500) * 100;
+                if (progressBar) {
+                    progressBar.style.width = progress + '%';
+                }
+
+                if (clearAllHoldTime >= 1500) {
+                    clearInterval(clearAllInterval);
+                    clearAllConversations();
+                    const originalText = clearAllBtn.textContent;
+                    clearAllBtn.textContent = 'Cleared!';
+                    setTimeout(function() {
+                        clearAllBtn.textContent = originalText;
+                        if (progressBar) {
+                            progressBar.style.display = 'none';
+                        }
+                    }, 1000);
+                }
+            }, 10);
+        }
+
+        function endHold() {
+            clearInterval(clearAllInterval);
+            clearAllHoldTime = 0;
+            const progressBar = clearProgressBar || clearAllBtn.querySelector('.strikebot-clear-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = '0';
+                progressBar.style.display = 'none';
+            }
+        }
+
+        clearAllBtn.addEventListener('mousedown', startHold);
+        clearAllBtn.addEventListener('mouseup', endHold);
+        clearAllBtn.addEventListener('mouseleave', endHold);
+        clearAllBtn.addEventListener('touchstart', startHold);
+        clearAllBtn.addEventListener('touchend', endHold);
+    }
+
+    // Scroll to bottom handler
+    function setupScrollToBottomHandler() {
+        if (!scrollBottomBtn) return;
+
+        scrollBottomBtn.addEventListener('click', function() {
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        messages.addEventListener('scroll', updateScrollButton);
+    }
+
+    // Settings panel handler
+    function setupSettingsPanel() {
+        var settings = loadSettings();
+
+        // Font size buttons in sidebar
+        document.querySelectorAll('.strikebot-font-size-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var size = btn.getAttribute('data-size');
+                if (size) {
+                    settings.fontSize = size;
+                    saveSettings(settings);
+                    applySettings(settings);
+                    // Update active state on buttons
+                    document.querySelectorAll('.strikebot-font-size-btn').forEach(function(b) {
+                        b.classList.toggle('active', b.getAttribute('data-size') === size);
+                    });
+                }
+            });
+        });
+
+        // Sound toggle
+        if (soundToggle) {
+            soundToggle.checked = settings.soundNotifications;
+            soundToggle.addEventListener('change', function() {
+                settings.soundNotifications = soundToggle.checked;
+                saveSettings(settings);
+            });
+        }
+
+        // Timestamps toggle
+        if (timestampsToggle) {
+            timestampsToggle.checked = settings.showTimestamps;
+            timestampsToggle.addEventListener('change', function() {
+                settings.showTimestamps = timestampsToggle.checked;
+                saveSettings(settings);
+                applySettings(settings);
+            });
+        }
+
+        // Apply initial settings
+        applySettings(settings);
+
+        // Set initial active state on font size buttons
+        document.querySelectorAll('.strikebot-font-size-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-size') === settings.fontSize);
+        });
+    }
+
+    // Initialize chat with loaded history or welcome message
+    function initializeChat() {
+        const settings = loadSettings();
+        applySettings(settings);
+
+        if (currentMessages.length === 0) {
+            addMessage('Hello! How can I help you today?');
+        }
+
+        refreshHistoryList();
+    }
+
+    // Event listeners - Original functionality
     toggle.addEventListener('click', toggleChat);
     closeBtn.addEventListener('click', toggleChat);
 
@@ -344,8 +861,12 @@
 
     // Close on escape
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && isOpen) {
-            toggleChat();
+        if (e.key === 'Escape') {
+            if (sidebar && sidebar.classList.contains('strikebot-sidebar-open')) {
+                closeSidebar();
+            } else if (isOpen) {
+                toggleChat();
+            }
         }
     });
 
@@ -355,5 +876,44 @@
             toggleChat();
         }
     });
+
+    // New feature event listeners
+    if (hamburger) {
+        hamburger.addEventListener('click', toggleSidebar);
+    }
+
+    if (closeSidebarBtn) {
+        closeSidebarBtn.addEventListener('click', closeSidebar);
+    }
+
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeSidebar);
+    }
+
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', startNewChat);
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportChat);
+    }
+
+    // Close sidebar when clicking outside
+    document.addEventListener('click', function(e) {
+        if (sidebar && sidebar.classList.contains('strikebot-sidebar-open') &&
+            !sidebar.contains(e.target) && !hamburger.contains(e.target)) {
+            closeSidebar();
+        }
+    });
+
+    // No separate settings panel - settings are in the sidebar
+
+    // Setup all new feature handlers
+    setupClearAllHandler();
+    setupScrollToBottomHandler();
+    setupSettingsPanel();
+
+    // Initialize
+    initializeChat();
 
 })();

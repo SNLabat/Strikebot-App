@@ -13,6 +13,8 @@ struct StrikebotConfig: Codable {
     let widget: WidgetConfig
     let limits: LimitsConfig
     let features: FeaturesConfig
+    let conversationStarters: [String]?
+    let fallbackMessage: String?
 
     struct ThemeConfig: Codable {
         let displayMode: String

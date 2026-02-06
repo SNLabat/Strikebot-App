@@ -30,6 +30,15 @@ interface iOSChatbotConfig {
   features: {
     removeBranding: boolean;
   };
+  conversationStarters?: string[];
+  fallbackMessage?: string;
+  knowledgeBase?: {
+    sitemapUrls?: string[];
+    pageUrls?: string[];
+    textEntries?: Array<{ title: string; content: string }>;
+    qaEntries?: Array<{ question: string; answer: string }>;
+    fileReferences?: Array<{ name: string; type: string }>;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -97,6 +106,9 @@ export async function POST(request: NextRequest) {
       'ChatView.swift',
       'ChatBubbleView.swift',
       'ChatInputView.swift',
+      'SettingsManager.swift',
+      'ChatHistoryManager.swift',
+      'SidebarView.swift',
     ];
 
     for (const file of swiftFiles) {
@@ -224,6 +236,16 @@ The configuration file controls:
 - Theme colors and display mode
 - Welcome message and placeholder text
 - Message limits and context length
+- Conversation starters
+- Fallback message
+
+## Features
+
+- **Hamburger Menu**: Tap the menu icon to open the sidebar
+- **Chat History**: Previous conversations are automatically saved and accessible from the sidebar
+- **Settings**: Adjust font size, toggle timestamps, and enable/disable sound notifications
+- **Conversation Starters**: Pre-configured quick-start prompts shown on new chats
+- **Clear All Chats**: Press and hold the "Clear All Chats" button in the sidebar (1.5s) to delete all history
 
 ## Requirements
 

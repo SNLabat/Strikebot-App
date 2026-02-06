@@ -4,6 +4,9 @@ struct ChatBubbleView: View {
     let message: ChatMessage
     let primaryColor: Color
     let textColor: Color
+    var fontSize: CGFloat = 17
+    var timestampFontSize: CGFloat = 11
+    var showTimestamp: Bool = true
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -14,18 +17,20 @@ struct ChatBubbleView: View {
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
                 // Message content
                 Text(message.content)
-                    .font(.body)
+                    .font(.system(size: fontSize))
                     .foregroundColor(message.isUser ? .white : textColor)
                     .textSelection(.enabled)
 
                 // Timestamp
-                Text(formatTime(message.timestamp))
-                    .font(.caption2)
-                    .foregroundColor(
-                        message.isUser
-                            ? .white.opacity(0.7)
-                            : .secondary
-                    )
+                if showTimestamp {
+                    Text(formatTime(message.timestamp))
+                        .font(.system(size: timestampFontSize))
+                        .foregroundColor(
+                            message.isUser
+                                ? .white.opacity(0.7)
+                                : .secondary
+                        )
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

@@ -16,6 +16,9 @@
 		A10000010000000000000007 /* ChatInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000007 /* ChatInputView.swift */; };
 		A10000010000000000000008 /* StrikebotConfig.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000008 /* StrikebotConfig.json */; };
 		A10000010000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000009 /* Assets.xcassets */; };
+		A1000001000000000000000C /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000000C /* SettingsManager.swift */; };
+		A1000001000000000000000D /* ChatHistoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000000D /* ChatHistoryManager.swift */; };
+		A1000001000000000000000E /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002000000000000000E /* SidebarView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +33,9 @@
 		A10000020000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000002000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000002000000000000000B /* StrikebotChatbot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StrikebotChatbot.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000002000000000000000C /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
+		A1000002000000000000000D /* ChatHistoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryManager.swift; sourceTree = "<group>"; };
+		A1000002000000000000000E /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +67,9 @@
 				A10000020000000000000005 /* ChatView.swift */,
 				A10000020000000000000006 /* ChatBubbleView.swift */,
 				A10000020000000000000007 /* ChatInputView.swift */,
+				A1000002000000000000000C /* SettingsManager.swift */,
+				A1000002000000000000000D /* ChatHistoryManager.swift */,
+				A1000002000000000000000E /* SidebarView.swift */,
 				A10000020000000000000008 /* StrikebotConfig.json */,
 				A10000020000000000000009 /* Assets.xcassets */,
 				A1000002000000000000000A /* Info.plist */,
@@ -153,6 +162,9 @@
 				A10000010000000000000005 /* ChatView.swift in Sources */,
 				A10000010000000000000006 /* ChatBubbleView.swift in Sources */,
 				A10000010000000000000007 /* ChatInputView.swift in Sources */,
+				A1000001000000000000000C /* SettingsManager.swift in Sources */,
+				A1000001000000000000000D /* ChatHistoryManager.swift in Sources */,
+				A1000001000000000000000E /* SidebarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,6 +1,29 @@
 export type TierName = 'starter' | 'professional' | 'business' | 'enterprise';
 export type BillingPeriod = 'monthly' | 'annual';
 
+// App-level settings for the builder UI
+export interface AppSettings {
+  fontSize: 'small' | 'medium' | 'large' | 'xlarge';
+  showTimestamps: boolean;
+  soundEnabled: boolean;
+}
+
+// Chat testing types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AddOn {
   id: string;
   name: string;

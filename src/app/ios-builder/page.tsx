@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import IOSSidebar, { IOSAppSettings, IOSChatMessage, IOSChatSession } from '@/components/ios/IOSSidebar';
+import IOSChatTester from '@/components/ios/IOSChatTester';
 
 // ── Types ──────────────────────────────────────────────
+
+interface KnowledgeBase {
+  sitemapUrls: string[];
+  pageUrls: string[];
+  textEntries: Array<{ title: string; content: string }>;
+  qaEntries: Array<{ question: string; answer: string }>;
+  fileReferences: Array<{ name: string; type: string }>;
+}
 
 interface iOSConfig {
   chatbotName: string;
@@ -30,6 +40,9 @@ interface iOSConfig {
   features: {
     removeBranding: boolean;
   };
+  knowledgeBase: KnowledgeBase;
+  fallbackMessage: string;
+  conversationStarters: string[];
 }
 
 const DEFAULT_CONFIG: iOSConfig = {
@@ -58,6 +71,21 @@ const DEFAULT_CONFIG: iOSConfig = {
   features: {
     removeBranding: false,
   },
+  knowledgeBase: {
+    sitemapUrls: [],
+    pageUrls: [],
+    textEntries: [],
+    qaEntries: [],
+    fileReferences: [],
+  },
+  fallbackMessage: '',
+  conversationStarters: [],
+};
+
+const DEFAULT_SETTINGS: IOSAppSettings = {
+  fontSize: 'medium',
+  showTimestamps: true,
+  soundEnabled: true,
 };
 
 const MODELS = [
@@ -78,7 +106,7 @@ const COLOR_PRESETS = [
   { name: 'Teal', primary: '#0D9488', secondary: '#0F766E' },
 ];
 
-const STEPS = ['Settings', 'Theme', 'Widget', 'Preview'];
+const STEPS = ['Settings', 'Knowledge', 'Theme', 'Widget', 'Chat', 'Preview'];
 
 // ── Main Component ─────────────────────────────────────
 
@@ -87,11 +115,110 @@ export default function iOSBuilderPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // App settings
+  const [appSettings, setAppSettings] = useState<IOSAppSettings>(DEFAULT_SETTINGS);
+
+  // Chat testing state
+  const [chatSessions, setChatSessions] = useState<IOSChatSession[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [currentMessages, setCurrentMessages] = useState<IOSChatMessage[]>([]);
+
+  // Load from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('strikebot-ios-settings');
+      if (saved) setAppSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
+      const sessions = localStorage.getItem('strikebot-ios-sessions');
+      if (sessions) setChatSessions(JSON.parse(sessions));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSettingsChange = useCallback((s: IOSAppSettings) => {
+    setAppSettings(s);
+    try { localStorage.setItem('strikebot-ios-settings', JSON.stringify(s)); } catch { /* */ }
+  }, []);
+
+  const saveSessions = useCallback((sessions: IOSChatSession[]) => {
+    setChatSessions(sessions);
+    try { localStorage.setItem('strikebot-ios-sessions', JSON.stringify(sessions)); } catch { /* */ }
+  }, []);
+
+  const handleMessagesChange = useCallback((messages: IOSChatMessage[]) => {
+    setCurrentMessages(messages);
+    if (messages.length === 0) return;
+
+    const title = messages[0]?.content.slice(0, 50) || 'New Chat';
+    const now = new Date().toISOString();
+
+    setChatSessions((prev) => {
+      let updated: IOSChatSession[];
+      if (activeChatId) {
+        const exists = prev.some((s) => s.id === activeChatId);
+        if (exists) {
+          updated = prev.map((s) => s.id === activeChatId ? { ...s, messages, title, updatedAt: now } : s);
+        } else {
+          updated = [{ id: activeChatId, title, messages, createdAt: now, updatedAt: now }, ...prev];
+        }
+      } else {
+        const newId = `chat-${Date.now()}`;
+        setActiveChatId(newId);
+        updated = [{ id: newId, title, messages, createdAt: now, updatedAt: now }, ...prev];
+      }
+      updated = updated.slice(0, 50);
+      try { localStorage.setItem('strikebot-ios-sessions', JSON.stringify(updated)); } catch { /* */ }
+      return updated;
+    });
+  }, [activeChatId]);
+
+  const handleSelectChat = useCallback((id: string) => {
+    const session = chatSessions.find((s) => s.id === id);
+    if (session) {
+      setActiveChatId(id);
+      setCurrentMessages(session.messages);
+      setCurrentStep(4); // Chat step
+    }
+  }, [chatSessions]);
+
+  const handleDeleteChat = useCallback((id: string) => {
+    const updated = chatSessions.filter((s) => s.id !== id);
+    saveSessions(updated);
+    if (activeChatId === id) { setActiveChatId(null); setCurrentMessages([]); }
+  }, [chatSessions, activeChatId, saveSessions]);
+
+  const handleClearAllChats = useCallback(() => {
+    saveSessions([]); setActiveChatId(null); setCurrentMessages([]);
+  }, [saveSessions]);
+
+  const handleNewChat = useCallback(() => {
+    setActiveChatId(null); setCurrentMessages([]); setCurrentStep(4);
+  }, []);
+
+  const handleExportChat = useCallback(() => {
+    if (currentMessages.length === 0) return;
+    const text = currentMessages.map((m) => {
+      const time = new Date(m.timestamp).toLocaleString();
+      const role = m.role === 'user' ? 'You' : 'Bot';
+      return `[${time}] ${role}: ${m.content}`;
+    }).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `strikebot-ios-chat-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }, [currentMessages]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateConfig = (path: string, value: any) => {
     setConfig((prev) => {
       const parts = path.split('.');
       const newConfig = JSON.parse(JSON.stringify(prev));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let current: any = newConfig;
       for (let i = 0; i < parts.length - 1; i++) {
         current = current[parts[i]];
@@ -131,6 +258,7 @@ export default function iOSBuilderPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -140,29 +268,57 @@ export default function iOSBuilderPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      {/* Sidebar */}
+      <IOSSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        currentStep={currentStep}
+        onStepChange={setCurrentStep}
+        steps={STEPS}
+        settings={appSettings}
+        onSettingsChange={handleSettingsChange}
+        chatSessions={chatSessions}
+        activeChatId={activeChatId}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onClearAllChats={handleClearAllChats}
+        onNewChat={handleNewChat}
+        onExportChat={handleExportChat}
+      />
+
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Hamburger Menu */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+              aria-label="Open menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm">
               S
             </div>
             <h1 className="text-lg font-semibold">Strikebot iOS Builder</h1>
           </div>
           <a href="/" className="text-sm text-gray-400 hover:text-white transition">
-            &larr; Back to WordPress Builder
+            &larr; WordPress Builder
           </a>
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Step Indicator */}
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto scrollbar-hide">
           {STEPS.map((step, i) => (
             <button
               key={step}
               onClick={() => setCurrentStep(i)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap ${
                 i === currentStep
                   ? 'bg-blue-600 text-white'
                   : i < currentStep
@@ -173,25 +329,36 @@ export default function iOSBuilderPage() {
               <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs">
                 {i < currentStep ? '✓' : i + 1}
               </span>
-              {step}
+              <span className="hidden sm:inline">{step}</span>
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Form Panel */}
-          <div className="lg:col-span-3">
+          <div className={currentStep === 4 ? 'lg:col-span-5' : 'lg:col-span-3'}>
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
               {currentStep === 0 && (
                 <SettingsStep config={config} updateConfig={updateConfig} />
               )}
               {currentStep === 1 && (
-                <ThemeStep config={config} updateConfig={updateConfig} />
+                <KnowledgeStep config={config} updateConfig={updateConfig} setConfig={setConfig} />
               )}
               {currentStep === 2 && (
-                <WidgetStep config={config} updateConfig={updateConfig} />
+                <ThemeStep config={config} updateConfig={updateConfig} />
               )}
               {currentStep === 3 && (
+                <WidgetStep config={config} updateConfig={updateConfig} />
+              )}
+              {currentStep === 4 && (
+                <IOSChatTester
+                  config={config}
+                  settings={appSettings}
+                  messages={currentMessages}
+                  onMessagesChange={handleMessagesChange}
+                />
+              )}
+              {currentStep === 5 && (
                 <PreviewStep config={config} />
               )}
 
@@ -234,12 +401,14 @@ export default function iOSBuilderPage() {
             </div>
           </div>
 
-          {/* iPhone Preview */}
-          <div className="lg:col-span-2">
-            <div className="sticky top-8">
-              <PhonePreview config={config} />
+          {/* iPhone Preview - hide on Chat step */}
+          {currentStep !== 4 && (
+            <div className="lg:col-span-2">
+              <div className="sticky top-8">
+                <PhonePreview config={config} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -253,6 +422,7 @@ function SettingsStep({
   updateConfig,
 }: {
   config: iOSConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateConfig: (path: string, value: any) => void;
 }) {
   return (
@@ -350,13 +520,332 @@ function SettingsStep({
   );
 }
 
-// ── Step 2: Theme ──────────────────────────────────────
+// ── Step 2: Knowledge Base ─────────────────────────────
+
+type KBTab = 'sitemap' | 'urls' | 'text' | 'qa' | 'files' | 'starters' | 'fallback';
+
+function KnowledgeStep({
+  config,
+  updateConfig,
+  setConfig,
+}: {
+  config: iOSConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateConfig: (path: string, value: any) => void;
+  setConfig: React.Dispatch<React.SetStateAction<iOSConfig>>;
+}) {
+  const [activeKBTab, setActiveKBTab] = useState<KBTab>('sitemap');
+  const [sitemapUrl, setSitemapUrl] = useState('');
+  const [pageUrl, setPageUrl] = useState('');
+  const [textTitle, setTextTitle] = useState('');
+  const [textContent, setTextContent] = useState('');
+  const [qaQuestion, setQaQuestion] = useState('');
+  const [qaAnswer, setQaAnswer] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [fileType, setFileType] = useState('pdf');
+  const [starterText, setStarterText] = useState('');
+
+  const kb = config.knowledgeBase;
+
+  const KB_TABS: { id: KBTab; label: string }[] = [
+    { id: 'sitemap', label: 'Sitemaps' },
+    { id: 'urls', label: 'URLs' },
+    { id: 'text', label: 'Text' },
+    { id: 'qa', label: 'Q&A' },
+    { id: 'files', label: 'Files' },
+    { id: 'starters', label: 'Starters' },
+    { id: 'fallback', label: 'Fallback' },
+  ];
+
+  const addSitemap = () => {
+    if (!sitemapUrl.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, sitemapUrls: [...prev.knowledgeBase.sitemapUrls, sitemapUrl.trim()] },
+    }));
+    setSitemapUrl('');
+  };
+
+  const removeSitemap = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, sitemapUrls: prev.knowledgeBase.sitemapUrls.filter((_, i) => i !== index) },
+    }));
+  };
+
+  const addPageUrl = () => {
+    if (!pageUrl.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, pageUrls: [...prev.knowledgeBase.pageUrls, pageUrl.trim()] },
+    }));
+    setPageUrl('');
+  };
+
+  const removePageUrl = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, pageUrls: prev.knowledgeBase.pageUrls.filter((_, i) => i !== index) },
+    }));
+  };
+
+  const addTextEntry = () => {
+    if (!textTitle.trim() || !textContent.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, textEntries: [...prev.knowledgeBase.textEntries, { title: textTitle.trim(), content: textContent.trim() }] },
+    }));
+    setTextTitle(''); setTextContent('');
+  };
+
+  const removeTextEntry = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, textEntries: prev.knowledgeBase.textEntries.filter((_, i) => i !== index) },
+    }));
+  };
+
+  const addQA = () => {
+    if (!qaQuestion.trim() || !qaAnswer.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, qaEntries: [...prev.knowledgeBase.qaEntries, { question: qaQuestion.trim(), answer: qaAnswer.trim() }] },
+    }));
+    setQaQuestion(''); setQaAnswer('');
+  };
+
+  const removeQA = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, qaEntries: prev.knowledgeBase.qaEntries.filter((_, i) => i !== index) },
+    }));
+  };
+
+  const addFile = () => {
+    if (!fileName.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, fileReferences: [...prev.knowledgeBase.fileReferences, { name: fileName.trim(), type: fileType }] },
+    }));
+    setFileName('');
+  };
+
+  const removeFile = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      knowledgeBase: { ...prev.knowledgeBase, fileReferences: prev.knowledgeBase.fileReferences.filter((_, i) => i !== index) },
+    }));
+  };
+
+  const addStarter = () => {
+    if (!starterText.trim()) return;
+    setConfig((prev) => ({
+      ...prev,
+      conversationStarters: [...prev.conversationStarters, starterText.trim()],
+    }));
+    setStarterText('');
+  };
+
+  const removeStarter = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      conversationStarters: prev.conversationStarters.filter((_, i) => i !== index),
+    }));
+  };
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-semibold mb-1">Knowledge Base</h2>
+      <p className="text-sm text-gray-400 mb-4">Configure the data sources and behavior for your chatbot.</p>
+
+      {/* KB Tab Nav */}
+      <div className="flex flex-wrap gap-1 mb-4">
+        {KB_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveKBTab(tab.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              activeKBTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            {tab.label}
+            {tab.id === 'sitemap' && kb.sitemapUrls.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{kb.sitemapUrls.length}</span>
+            )}
+            {tab.id === 'urls' && kb.pageUrls.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{kb.pageUrls.length}</span>
+            )}
+            {tab.id === 'text' && kb.textEntries.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{kb.textEntries.length}</span>
+            )}
+            {tab.id === 'qa' && kb.qaEntries.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{kb.qaEntries.length}</span>
+            )}
+            {tab.id === 'files' && kb.fileReferences.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{kb.fileReferences.length}</span>
+            )}
+            {tab.id === 'starters' && config.conversationStarters.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500/30 text-[10px]">{config.conversationStarters.length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Sitemap URLs */}
+      {activeKBTab === 'sitemap' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Add sitemap URLs to crawl for training data.</p>
+          <div className="flex gap-2">
+            <input value={sitemapUrl} onChange={(e) => setSitemapUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSitemap()} className="input flex-1" placeholder="https://example.com/sitemap.xml" />
+            <button onClick={addSitemap} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add</button>
+          </div>
+          {kb.sitemapUrls.map((url, i) => (
+            <div key={i} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-2">
+              <span className="text-sm text-gray-300 truncate">{url}</span>
+              <button onClick={() => removeSitemap(i)} className="text-gray-500 hover:text-red-400 transition text-xs ml-2">Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Page URLs */}
+      {activeKBTab === 'urls' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Add specific page URLs to include as training data.</p>
+          <div className="flex gap-2">
+            <input value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addPageUrl()} className="input flex-1" placeholder="https://example.com/about" />
+            <button onClick={addPageUrl} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add</button>
+          </div>
+          {kb.pageUrls.map((url, i) => (
+            <div key={i} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-2">
+              <span className="text-sm text-gray-300 truncate">{url}</span>
+              <button onClick={() => removePageUrl(i)} className="text-gray-500 hover:text-red-400 transition text-xs ml-2">Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Text Entries */}
+      {activeKBTab === 'text' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Add custom text content for the knowledge base.</p>
+          <Field label="Title">
+            <input value={textTitle} onChange={(e) => setTextTitle(e.target.value)} className="input" placeholder="Topic title" />
+          </Field>
+          <Field label="Content">
+            <textarea value={textContent} onChange={(e) => setTextContent(e.target.value)} className="input min-h-[80px] resize-y" placeholder="Enter detailed content..." rows={3} />
+          </Field>
+          <button onClick={addTextEntry} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add Entry</button>
+          {kb.textEntries.map((entry, i) => (
+            <div key={i} className="bg-gray-800/50 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-200">{entry.title}</span>
+                <button onClick={() => removeTextEntry(i)} className="text-gray-500 hover:text-red-400 transition text-xs">Remove</button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{entry.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Q&A Pairs */}
+      {activeKBTab === 'qa' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Add question-answer pairs for precise responses.</p>
+          <Field label="Question">
+            <input value={qaQuestion} onChange={(e) => setQaQuestion(e.target.value)} className="input" placeholder="What is your return policy?" />
+          </Field>
+          <Field label="Answer">
+            <textarea value={qaAnswer} onChange={(e) => setQaAnswer(e.target.value)} className="input min-h-[60px] resize-y" placeholder="Our return policy allows..." rows={2} />
+          </Field>
+          <button onClick={addQA} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add Q&A</button>
+          {kb.qaEntries.map((entry, i) => (
+            <div key={i} className="bg-gray-800/50 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-200">Q: {entry.question}</span>
+                <button onClick={() => removeQA(i)} className="text-gray-500 hover:text-red-400 transition text-xs">Remove</button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2">A: {entry.answer}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* File References */}
+      {activeKBTab === 'files' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Reference files to include in your knowledge base.</p>
+          <div className="flex gap-2">
+            <input value={fileName} onChange={(e) => setFileName(e.target.value)} className="input flex-1" placeholder="document.pdf" />
+            <select value={fileType} onChange={(e) => setFileType(e.target.value)} className="input w-28">
+              <option value="pdf">PDF</option>
+              <option value="txt">TXT</option>
+              <option value="csv">CSV</option>
+              <option value="doc">DOC</option>
+              <option value="json">JSON</option>
+            </select>
+            <button onClick={addFile} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add</button>
+          </div>
+          {kb.fileReferences.map((file, i) => (
+            <div key={i} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded text-[10px] font-medium uppercase">{file.type}</span>
+                <span className="text-sm text-gray-300">{file.name}</span>
+              </div>
+              <button onClick={() => removeFile(i)} className="text-gray-500 hover:text-red-400 transition text-xs">Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Conversation Starters */}
+      {activeKBTab === 'starters' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Suggested conversation starters shown to users.</p>
+          <div className="flex gap-2">
+            <input value={starterText} onChange={(e) => setStarterText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStarter()} className="input flex-1" placeholder="What services do you offer?" />
+            <button onClick={addStarter} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition">Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {config.conversationStarters.map((s, i) => (
+              <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 rounded-full text-sm text-gray-300">
+                {s}
+                <button onClick={() => removeStarter(i)} className="text-gray-500 hover:text-red-400 transition">&times;</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Message */}
+      {activeKBTab === 'fallback' && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400">Message shown when the chatbot cannot answer a question.</p>
+          <Field label="Fallback Message">
+            <textarea
+              value={config.fallbackMessage}
+              onChange={(e) => updateConfig('fallbackMessage', e.target.value)}
+              className="input min-h-[80px] resize-y"
+              placeholder="I'm sorry, I don't have information about that. Please contact our support team."
+              rows={3}
+            />
+          </Field>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 3: Theme ──────────────────────────────────────
 
 function ThemeStep({
   config,
   updateConfig,
 }: {
   config: iOSConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateConfig: (path: string, value: any) => void;
 }) {
   const applyPreset = (preset: (typeof COLOR_PRESETS)[0]) => {
@@ -368,7 +857,6 @@ function ThemeStep({
     <div className="space-y-5">
       <h2 className="text-xl font-semibold mb-4">Theme</h2>
 
-      {/* Display Mode */}
       <Field label="Display Mode">
         <div className="flex gap-3">
           {['light', 'dark'].map((mode) => (
@@ -396,7 +884,6 @@ function ThemeStep({
         </div>
       </Field>
 
-      {/* Color Presets */}
       <Field label="Color Presets">
         <div className="grid grid-cols-3 gap-2">
           {COLOR_PRESETS.map((preset) => (
@@ -419,70 +906,29 @@ function ThemeStep({
         </div>
       </Field>
 
-      {/* Custom Colors */}
       <div className="grid grid-cols-2 gap-4">
         <Field label="Primary Color">
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={config.theme.primaryColor}
-              onChange={(e) => updateConfig('theme.primaryColor', e.target.value)}
-              className="w-10 h-10 rounded cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={config.theme.primaryColor}
-              onChange={(e) => updateConfig('theme.primaryColor', e.target.value)}
-              className="input flex-1"
-            />
+            <input type="color" value={config.theme.primaryColor} onChange={(e) => updateConfig('theme.primaryColor', e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0" />
+            <input type="text" value={config.theme.primaryColor} onChange={(e) => updateConfig('theme.primaryColor', e.target.value)} className="input flex-1" />
           </div>
         </Field>
         <Field label="Secondary Color">
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={config.theme.secondaryColor}
-              onChange={(e) => updateConfig('theme.secondaryColor', e.target.value)}
-              className="w-10 h-10 rounded cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={config.theme.secondaryColor}
-              onChange={(e) => updateConfig('theme.secondaryColor', e.target.value)}
-              className="input flex-1"
-            />
+            <input type="color" value={config.theme.secondaryColor} onChange={(e) => updateConfig('theme.secondaryColor', e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0" />
+            <input type="text" value={config.theme.secondaryColor} onChange={(e) => updateConfig('theme.secondaryColor', e.target.value)} className="input flex-1" />
           </div>
         </Field>
         <Field label="Background Color">
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={config.theme.backgroundColor}
-              onChange={(e) => updateConfig('theme.backgroundColor', e.target.value)}
-              className="w-10 h-10 rounded cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={config.theme.backgroundColor}
-              onChange={(e) => updateConfig('theme.backgroundColor', e.target.value)}
-              className="input flex-1"
-            />
+            <input type="color" value={config.theme.backgroundColor} onChange={(e) => updateConfig('theme.backgroundColor', e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0" />
+            <input type="text" value={config.theme.backgroundColor} onChange={(e) => updateConfig('theme.backgroundColor', e.target.value)} className="input flex-1" />
           </div>
         </Field>
         <Field label="Text Color">
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={config.theme.textColor}
-              onChange={(e) => updateConfig('theme.textColor', e.target.value)}
-              className="w-10 h-10 rounded cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={config.theme.textColor}
-              onChange={(e) => updateConfig('theme.textColor', e.target.value)}
-              className="input flex-1"
-            />
+            <input type="color" value={config.theme.textColor} onChange={(e) => updateConfig('theme.textColor', e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0" />
+            <input type="text" value={config.theme.textColor} onChange={(e) => updateConfig('theme.textColor', e.target.value)} className="input flex-1" />
           </div>
         </Field>
       </div>
@@ -490,13 +936,14 @@ function ThemeStep({
   );
 }
 
-// ── Step 3: Widget ─────────────────────────────────────
+// ── Step 4: Widget ─────────────────────────────────────
 
 function WidgetStep({
   config,
   updateConfig,
 }: {
   config: iOSConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateConfig: (path: string, value: any) => void;
 }) {
   return (
@@ -538,9 +985,12 @@ function WidgetStep({
   );
 }
 
-// ── Step 4: Preview ────────────────────────────────────
+// ── Step 6: Preview ────────────────────────────────────
 
 function PreviewStep({ config }: { config: iOSConfig }) {
+  const kb = config.knowledgeBase;
+  const totalKB = kb.sitemapUrls.length + kb.pageUrls.length + kb.textEntries.length + kb.qaEntries.length + kb.fileReferences.length;
+
   return (
     <div className="space-y-5">
       <h2 className="text-xl font-semibold mb-4">Review Configuration</h2>
@@ -560,23 +1010,33 @@ function PreviewStep({ config }: { config: iOSConfig }) {
           />
         </SummarySection>
 
+        {totalKB > 0 && (
+          <SummarySection title="Knowledge Base">
+            {kb.sitemapUrls.length > 0 && <SummaryItem label="Sitemaps" value={`${kb.sitemapUrls.length} URL(s)`} />}
+            {kb.pageUrls.length > 0 && <SummaryItem label="Page URLs" value={`${kb.pageUrls.length} URL(s)`} />}
+            {kb.textEntries.length > 0 && <SummaryItem label="Text Entries" value={`${kb.textEntries.length} entry(ies)`} />}
+            {kb.qaEntries.length > 0 && <SummaryItem label="Q&A Pairs" value={`${kb.qaEntries.length} pair(s)`} />}
+            {kb.fileReferences.length > 0 && <SummaryItem label="Files" value={`${kb.fileReferences.length} file(s)`} />}
+          </SummarySection>
+        )}
+
+        {config.conversationStarters.length > 0 && (
+          <SummarySection title="Conversation Starters">
+            <div className="flex flex-wrap gap-1.5">
+              {config.conversationStarters.map((s, i) => (
+                <span key={i} className="px-2.5 py-1 bg-blue-600/20 text-blue-400 rounded-full text-xs">{s}</span>
+              ))}
+            </div>
+          </SummarySection>
+        )}
+
         <SummarySection title="Theme">
           <SummaryItem label="Display Mode" value={config.theme.displayMode} />
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400 w-32">Colors</span>
             <div className="flex gap-1">
-              {[
-                config.theme.primaryColor,
-                config.theme.secondaryColor,
-                config.theme.backgroundColor,
-                config.theme.textColor,
-              ].map((color, i) => (
-                <div
-                  key={i}
-                  className="w-6 h-6 rounded border border-gray-600"
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
+              {[config.theme.primaryColor, config.theme.secondaryColor, config.theme.backgroundColor, config.theme.textColor].map((color, i) => (
+                <div key={i} className="w-6 h-6 rounded border border-gray-600" style={{ backgroundColor: color }} title={color} />
               ))}
             </div>
           </div>
@@ -585,31 +1045,23 @@ function PreviewStep({ config }: { config: iOSConfig }) {
         <SummarySection title="Chat Settings">
           <SummaryItem label="Welcome Message" value={config.widget.welcomeMessage} />
           <SummaryItem label="Placeholder" value={config.widget.inputPlaceholder} />
-          <SummaryItem
-            label="Branding"
-            value={config.features.removeBranding ? 'Hidden' : 'Shown'}
-          />
+          <SummaryItem label="Branding" value={config.features.removeBranding ? 'Hidden' : 'Shown'} />
         </SummarySection>
 
         <SummarySection title="Limits">
-          <SummaryItem
-            label="History Messages"
-            value={config.limits.maxHistoryMessages.toString()}
-          />
-          <SummaryItem
-            label="Context Length"
-            value={config.limits.maxContextLength.toLocaleString() + ' chars'}
-          />
+          <SummaryItem label="History Messages" value={config.limits.maxHistoryMessages.toString()} />
+          <SummaryItem label="Context Length" value={config.limits.maxContextLength.toLocaleString() + ' chars'} />
         </SummarySection>
 
         <div className="p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-400 mb-2">
-            What you&apos;ll get
-          </h3>
+          <h3 className="text-sm font-medium text-blue-400 mb-2">What you&apos;ll get</h3>
           <ul className="text-sm text-gray-300 space-y-1">
             <li>&#10003; Complete Xcode project (.xcodeproj)</li>
             <li>&#10003; SwiftUI chatbot interface</li>
             <li>&#10003; Pre-configured with your settings</li>
+            <li>&#10003; Knowledge base configuration included</li>
+            <li>&#10003; Chat history &amp; settings menu</li>
+            <li>&#10003; Font size, timestamps, sound controls</li>
             <li>&#10003; Ready to build, sign, and run</li>
             <li>&#10003; iOS 16+ compatible</li>
           </ul>
@@ -633,28 +1085,29 @@ function PhonePreview({ config }: { config: iOSConfig }) {
         Live Preview
       </p>
 
-      {/* Phone Frame */}
       <div className="relative w-[280px] h-[560px] rounded-[40px] border-4 border-gray-700 bg-gray-900 overflow-hidden shadow-2xl">
-        {/* Notch */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120px] h-[30px] bg-gray-900 rounded-b-2xl z-10" />
 
-        {/* Screen */}
         <div
           className="absolute inset-[2px] rounded-[36px] overflow-hidden flex flex-col"
           style={{ backgroundColor: bg }}
         >
-          {/* Status Bar */}
           <div className="h-[44px] flex items-end justify-center pb-1">
             <span className="text-[10px] font-semibold" style={{ color: text }}>
               9:41
             </span>
           </div>
 
-          {/* Nav Bar */}
           <div
             className="px-4 py-2 flex items-center gap-2 border-b"
             style={{ borderColor: isDark ? '#374151' : '#E5E7EB' }}
           >
+            {/* Hamburger icon in preview */}
+            <div className="flex flex-col gap-[2px]">
+              <div className="w-3 h-[1.5px] rounded" style={{ backgroundColor: text }} />
+              <div className="w-3 h-[1.5px] rounded" style={{ backgroundColor: text }} />
+              <div className="w-3 h-[1.5px] rounded" style={{ backgroundColor: text }} />
+            </div>
             <div
               className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: primary }}
@@ -664,9 +1117,7 @@ function PhonePreview({ config }: { config: iOSConfig }) {
             </span>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-hidden px-3 py-3 space-y-2">
-            {/* Welcome message */}
             <div className="flex">
               <div
                 className="max-w-[75%] px-3 py-2 rounded-2xl rounded-bl-sm text-xs"
@@ -679,7 +1130,24 @@ function PhonePreview({ config }: { config: iOSConfig }) {
               </div>
             </div>
 
-            {/* Sample user message */}
+            {/* Conversation starters preview */}
+            {config.conversationStarters.length > 0 && (
+              <div className="flex flex-wrap gap-1 pl-1">
+                {config.conversationStarters.slice(0, 2).map((s, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded-full text-[8px] border"
+                    style={{
+                      borderColor: isDark ? '#374151' : '#D1D5DB',
+                      color: isDark ? '#9CA3AF' : '#6B7280',
+                    }}
+                  >
+                    {s.length > 20 ? s.slice(0, 20) + '...' : s}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="flex justify-end">
               <div
                 className="max-w-[75%] px-3 py-2 rounded-2xl rounded-br-sm text-xs text-white"
@@ -689,7 +1157,6 @@ function PhonePreview({ config }: { config: iOSConfig }) {
               </div>
             </div>
 
-            {/* Sample assistant reply */}
             <div className="flex">
               <div
                 className="max-w-[75%] px-3 py-2 rounded-2xl rounded-bl-sm text-xs"
@@ -703,7 +1170,6 @@ function PhonePreview({ config }: { config: iOSConfig }) {
             </div>
           </div>
 
-          {/* Input Bar */}
           <div
             className="px-3 py-2 flex items-center gap-2 border-t"
             style={{ borderColor: isDark ? '#374151' : '#E5E7EB' }}
@@ -725,7 +1191,6 @@ function PhonePreview({ config }: { config: iOSConfig }) {
             </div>
           </div>
 
-          {/* Branding */}
           {!config.features.removeBranding && (
             <div className="text-center py-1">
               <span
@@ -737,7 +1202,6 @@ function PhonePreview({ config }: { config: iOSConfig }) {
             </div>
           )}
 
-          {/* Home Indicator */}
           <div className="flex justify-center pb-2 pt-1">
             <div
               className="w-[100px] h-[4px] rounded-full"
